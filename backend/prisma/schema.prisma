@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+ 
+}
+
+model User {
+  id        Int           @id @default(autoincrement())
+  email     String        @unique
+  name      String
+  role      String        @default("STUDENT")
+  sessions  ExamSession[]
+  createdAt DateTime      @default(now())
+}
+
+model ExamSession {
+  id         Int           @id @default(autoincrement())
+  studentId  Int
+  startTime  DateTime      @default(now())
+  endTime    DateTime?
+  riskScore  Int           @default(0)
+  status     String        @default("ACTIVE")
+  incidents  IncidentLog[]
+  user       User          @relation(fields: [studentId], references: [id])
+}
+
+model IncidentLog {
+  id        Int      @id @default(autoincrement())
+  sessionId Int
+  type      String   // e.g., "MOBILE_PHONE", "MULTIPLE_FACES"
+  timestamp DateTime @default(now())
+  session   ExamSession @relation(fields: [sessionId], references: [id])
+}
