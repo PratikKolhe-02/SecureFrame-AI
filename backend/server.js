@@ -1,35 +1,43 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import examRoute from "./src/examRoute.js"; 
+app.post('/api/logs', async (req, res) => {
+  const { violations, timestamp } = req.body;
 
-dotenv.config();
+  try {
+    // 1. Create the ExamSession record first
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('ExamSession')
+      .insert([{
+        startTime: new Date(timestamp).toISOString(),
+        endTime: new Date().toISOString(),
+        status: 'completed',
+        riskScore: violations.length * 10 // Basic logic: more logs = higher risk
+      }])
+      .select()
+      .single();
 
-const app = express();
+    if (sessionError) throw sessionError;
 
-app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : "*",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-}));
+    const sessionId = sessionData.id;
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
+    // 2. If there are violations, link them to this sessionId
+    if (violations.length > 0) {
+      const logsToInsert = violations.map(log => ({
+        sessionId: sessionId, // Foreign Key link
+        description: log.msg,
+        type: 'AI_DETECTION',
+        timestamp: new Date().toISOString()
+      }));
 
-// Routing
-app.use("/api/exam", examRoute);
+      const { error: logError } = await supabase
+        .from('IncidentLog')
+        .insert(logsToInsert);
 
-app.get("/", (req, res) => {
-    res.status(200).json({
-        status: "online",
-        service: "SecureFrame-AI Backend",
-        timestamp: new Date().toISOString(),
-    });
+      if (logError) throw logError;
+    }
+
+    res.status(200).json({ message: "Session and Logs archived successfully", sessionId });
+    
+  } catch (error) {
+    console.error("❌ Database Sync Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
 });
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`[SecureFrame-AI] Server running on port ${PORT}`);
-});
-
-export default app;
