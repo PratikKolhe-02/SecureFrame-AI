@@ -1,68 +1,95 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { supabase } from './supabaseClient';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "./supabaseClient";
 
-export default function Signup() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [error, setError] = useState(null);
+const Signup = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    if (password !== confirm) return setError("Passwords do not match");
-    setError(null);
+    if (password !== confirmPassword) return setError("Passwords do not match");
     setLoading(true);
+    setError(null);
     const { error: authError } = await supabase.auth.signUp({ email, password });
     setLoading(false);
     if (authError) { setError(authError.message); return; }
-    alert("Verification email sent!");
-    navigate('/login');
+    alert("Signup successful! Check email for verification.");
+    navigate("/login");
+  };
+
+  const handleGoogleSignup = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) setError(error.message);
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white font-mono flex">
-      <div className="hidden lg:block lg:w-[60%] relative overflow-hidden border-r border-white/5 bg-[#07090e]">
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 200 200" className="h-[70vh] w-auto opacity-40">
-            <path d="M100,20 Q140,20 160,60 T160,140 T100,180 T40,140 T40,60 T100,20" fill="none" stroke="#39FF14" strokeWidth="0.5" />
-          </svg>
-        </div>
-        <div className="absolute inset-0 p-12 text-[#39FF14] text-[10px] tracking-[0.3em] font-bold flex flex-col justify-between uppercase">
-          <div>{">"} INIT: OPERATOR ENROLLMENT</div>
-          <div className="self-end">{">"} SECURITY LEVEL: ALPHA</div>
+    <div className="flex h-screen bg-[#07090e] text-white overflow-hidden font-mono">
+      <div className="relative hidden lg:flex w-1/2 items-center justify-center bg-[#07090e] border-r border-white/5 overflow-hidden">
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#39FF14 0.5px, transparent 0.5px)', backgroundSize: '30px 30px' }}></div>
+        <img src="/LeftPanel.png" alt="Visual Panel" className="relative z-10 max-h-[75%] object-contain select-none pointer-events-none opacity-90" />
+        <div className="scan-line z-20"></div>
+        <div className="absolute inset-0 p-10 flex flex-col justify-between pointer-events-none z-30 text-[#39FF14] text-[9px] font-bold tracking-[0.4em]">
+          <div className="flex justify-between"><span>{">"} SYSTEM: ENROLLMENT</span><span>{">"} STATUS: WAITING</span></div>
+          <div className="flex justify-between"><span>{">"} SECURITY: ACTIVE</span><span>{">"} VER: 3.2.0</span></div>
         </div>
       </div>
-      <div className="w-full lg:w-[40%] flex items-center justify-center p-8 bg-[#0d0f14]">
-        <div className="w-full max-w-md space-y-8">
-          <div className="flex items-center gap-3 text-[#39FF14] text-xs font-bold tracking-[0.4em] uppercase">
-            <div className="w-6 h-6 border border-[#39FF14] flex items-center justify-center text-[8px]">S</div>
-            SECUREFRAME-AI
+
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-[#0d0f14] px-12 lg:px-20">
+        <div className="w-full max-w-md space-y-6">
+          <div className="flex items-center gap-4">
+            <img src="/favicon.png" alt="Logo" className="w-7 h-7 object-contain" />
+            <div className="h-8 w-[1px] bg-white/10 mx-1"></div>
+            <div className="flex flex-col justify-center">
+              <span className="text-[#39FF14] text-[13px] font-black tracking-[0.4em] leading-none uppercase">SECUREFRAME - AI</span>
+              <span className="text-gray-500 text-[7px] tracking-[0.6em] leading-none uppercase mt-1.5">Advanced Proctoring</span>
+            </div>
           </div>
-          <h1 className="text-4xl font-black text-white tracking-tighter leading-none">CREATE<br/><span className="text-[#39FF14]">ACCOUNT</span></h1>
-          <form onSubmit={handleSignup} className="space-y-6">
-            <div className="space-y-1">
-              <label className="text-gray-500 text-[9px] font-bold tracking-widest uppercase">Institutional Email</label>
-              <input type="email" onChange={(e) => setEmail(e.target.value)} required className="w-full bg-black border border-[#39FF14]/30 focus:border-[#39FF14] rounded px-4 py-4 text-sm text-white outline-none transition-all" placeholder="id@vitbhopal.ac.in" />
+
+          <h1 className="text-2xl font-black tracking-[0.1em] text-white uppercase">CREATE ACCOUNT</h1>
+
+          <button 
+            onClick={handleGoogleSignup}
+            className="w-full bg-white text-black py-4 rounded font-bold text-[10px] tracking-[0.1em] uppercase flex items-center justify-center gap-3 hover:bg-gray-200 transition-all active:scale-[0.98]"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
+            Sign up with Google
+          </button>
+
+          <div className="flex items-center gap-4 py-1">
+            <div className="h-[1px] w-full bg-white/5"></div>
+            <span className="text-[9px] text-gray-600 font-bold uppercase tracking-widest whitespace-nowrap">OR ENROLL MANUALLY</span>
+            <div className="h-[1px] w-full bg-white/5"></div>
+          </div>
+
+          <form onSubmit={handleSignup} className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-[9px] font-bold text-gray-500 tracking-[0.3em] uppercase">Email ID</label>
+              <input type="email" required className="w-full bg-black border border-white/10 rounded px-4 py-4 text-sm text-white focus:border-[#39FF14] outline-none transition-all" placeholder="Enter your Email ID" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <label className="text-gray-500 text-[9px] font-bold tracking-widest uppercase">System Passcode</label>
-              <input type="password" onChange={(e) => setPassword(e.target.value)} required className="w-full bg-black border border-[#39FF14]/30 focus:border-[#39FF14] rounded px-4 py-4 text-sm text-white outline-none transition-all" placeholder="••••••••" />
+            <div className="space-y-2">
+              <label className="block text-[9px] font-bold text-gray-500 tracking-[0.3em] uppercase">Password</label>
+              <input type="password" required className="w-full bg-black border border-white/10 rounded px-4 py-4 text-sm text-white focus:border-[#39FF14] outline-none transition-all" placeholder="Enter your Password" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <div className="space-y-1">
-              <label className="text-gray-500 text-[9px] font-bold tracking-widest uppercase">Confirm Passcode</label>
-              <input type="password" onChange={(e) => setConfirm(e.target.value)} required className="w-full bg-black border border-[#39FF14]/30 focus:border-[#39FF14] rounded px-4 py-4 text-sm text-white outline-none transition-all" placeholder="••••••••" />
+            <div className="space-y-2">
+              <label className="block text-[9px] font-bold text-gray-500 tracking-[0.3em] uppercase">Confirm Password</label>
+              <input type="password" required className="w-full bg-black border border-white/10 rounded px-4 py-4 text-sm text-white focus:border-[#39FF14] outline-none transition-all" placeholder="Re-enter your Password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
-            {error && <div className="text-red-500 text-[10px] uppercase border-l-2 border-red-500 pl-2">{error}</div>}
-            <button type="submit" disabled={loading} className="w-full bg-[#39FF14] text-black font-black py-5 rounded text-[10px] tracking-widest uppercase hover:shadow-[0_0_20px_rgba(57,255,20,0.3)] disabled:opacity-50">
-              {loading ? 'ENROLLING...' : 'INITIALIZE ENROLLMENT'}
+            {error && <p className="text-red-500 text-[10px] uppercase border-l-2 border-red-500 pl-2">⚠ {error}</p>}
+            <button type="submit" disabled={loading} className="w-full bg-[#39FF14] text-black py-5 rounded font-black text-[10px] tracking-[0.3em] uppercase hover:shadow-[0_0_30px_rgba(57,255,20,0.4)] transition-all active:scale-[0.98] disabled:opacity-50">
+              {loading ? "PROCESSING..." : "GET STARTED"}
             </button>
+            <p className="text-[10px] text-center text-gray-600 tracking-[0.2em] uppercase">ALREADY HAVE AN ACCOUNT? <Link to="/login" className="text-[#39FF14] hover:underline font-bold ml-1">SIGN IN</Link></p>
           </form>
-          <p className="text-center text-[10px] text-gray-600 tracking-widest uppercase">Already registered? <Link to="/login" className="text-[#39FF14] hover:underline">Sign In</Link></p>
         </div>
       </div>
+      <style>{`.scan-line { position: absolute; width: 70%; height: 1px; left: 15%; background: #39FF14; box-shadow: 0 0 15px #39FF14, 0 0 30px #39FF14; animation: scanMove 4s ease-in-out infinite; } @keyframes scanMove { 0% { top: 20%; opacity: 0; } 10%, 90% { opacity: 1; } 100% { top: 80%; opacity: 0; } }`}</style>
     </div>
   );
-}
+};
+
+export default Signup;
