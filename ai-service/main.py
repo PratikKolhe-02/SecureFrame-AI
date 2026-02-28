@@ -23,14 +23,32 @@ async def analyze_frame(data: FrameData):
         
         violations = []
         p_count = raw_results.count("person")
-        if p_count > 1: violations.append("Multiple Persons")
-        elif p_count == 0: violations.append("No Person Detected")
-        if "cell phone" in raw_results: violations.append("Cell Phone")
+        
+        if p_count > 1: 
+            violations.append("Multiple Persons")
+        elif p_count == 0: 
+            violations.append("No Person Detected")
+        
+        # Expanded check: If AI sees a remote, it's usually a phone
+        phone_triggers = ["cell phone", "remote", "electronic", "mobile phone"]
+        if any(obj in raw_results for obj in phone_triggers):
+            violations.append("Cell Phone")
+            
+        if "book" in raw_results:
+            violations.append("Book")
+            
+        if "laptop" in raw_results:
+            violations.append("Laptop")
 
         return {"status": "success", "detections": violations}
     except Exception as e:
+        print(f"❌ ERROR: {e}")
         return {"status": "error", "message": str(e)}
 
 @app.get("/")
 def status():
     return {"status": "AI Service Live"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

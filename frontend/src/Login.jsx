@@ -20,7 +20,12 @@ const Login = () => {
   };
 
   const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    const { error } = await supabase.auth.signInWithOAuth({ 
+      provider: 'google',
+      options: { 
+        redirectTo: window.location.origin 
+      }
+    });
     if (error) setError(error.message);
   };
 
@@ -50,6 +55,7 @@ const Login = () => {
           <h1 className="text-2xl font-black tracking-[0.1em] text-white uppercase">WELCOME <span className="text-[#39FF14]">STUDENT</span></h1>
 
           <button 
+            type="button"
             onClick={handleGoogleLogin}
             className="w-full bg-white text-black py-4 rounded font-bold text-[10px] tracking-[0.1em] uppercase flex items-center justify-center gap-3 hover:bg-gray-200 transition-all active:scale-[0.98]"
           >

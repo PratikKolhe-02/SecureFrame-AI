@@ -21,10 +21,12 @@ export default function App() {
       setSession(session);
       setLoading(false);
     });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
@@ -35,7 +37,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
         <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/" />} />
-        <Route path="/" element={session ? <Index userId={session.user.id} /> : <Navigate to="/login" />} />
+        <Route path="/" element={session ? <Index session={session} /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
