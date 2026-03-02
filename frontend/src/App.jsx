@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { supabase } from './supabaseClient';
-
-import Index from './pages/Index';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
+import ExamPage from './pages/ExamPage';
 
 const SessionLoader = () => (
   <div className="min-h-screen bg-[#07090e] flex flex-col items-center justify-center font-mono text-center px-4">
@@ -42,11 +41,10 @@ export default function App() {
         <Route path="/signup" element={!session ? <Signup /> : <Navigate to="/dashboard" replace />} />
         
         <Route path="/dashboard" element={session ? <Dashboard session={session} /> : <Navigate to="/login" replace />} />
-        <Route path="/exam" element={session ? <Index session={session} /> : <Navigate to="/login" replace />} />
+        <Route path="/exam" element={session ? <ExamPage session={session} /> : <Navigate to="/login" replace />} />
         
-        {/* NEW ADMIN ROUTE */}
         <Route path="/admin" element={<Admin />} />
-
+        
         <Route path="/" element={<Navigate to={session ? "/dashboard" : "/login"} replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
