@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import base64, cv2, numpy as np, re, easyocr
@@ -97,6 +97,20 @@ async def analyze_frame(data: FrameData):
             violations.append("Laptop")
 
         return {"status": "success", "detections": violations}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.post("/analyze-audio")
+async def analyze_audio(file: UploadFile = File(...)):
+    try:
+        audio_bytes = await file.read()
+        audio_data = np.frombuffer(audio_bytes, dtype=np.int16)
+        if len(audio_data) == 0:
+            return {"status": "success", "suspicious": False}
+        rms = np.sqrt(np.mean(audio_data**2))
+        if rms > 350.0:
+            return {"status": "success", "suspicious": True, "intensity": float(rms)}
+        return {"status": "success", "suspicious": False}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
