@@ -7,6 +7,7 @@ import { ShieldCheck, Loader2, Activity, Cpu, AlertCircle, Zap, ChevronRight, Ca
 const ExamPage = ({ session }) => {
   const navigate = useNavigate();
   const webcamRef = useRef(null);
+  const examContainerRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioProcessorRef = useRef(null);
   const audioStreamRef = useRef(null);
@@ -29,6 +30,7 @@ const ExamPage = ({ session }) => {
   const [warningCount, setWarningCount] = useState(0);
   const [activeWarning, setActiveWarning] = useState(null);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [clipboardToast, setClipboardToast] = useState(null);
 
   const warningCooldownRef = useRef(false);
   const isTerminatingRef = useRef(false);
@@ -94,6 +96,10 @@ const ExamPage = ({ session }) => {
     cleanUpProctoringListeners();
     setShowWarningModal(false);
     showWarningModalRef.current = false;
+    
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => {});
+    }
 
     const sessionId = currentSessionIdRef.current;
     if (sessionId) {
@@ -299,6 +305,10 @@ const ExamPage = ({ session }) => {
     setIsInitializing(true);
     isTerminatingRef.current = false;
 
+    if (examContainerRef.current) {
+      examContainerRef.current.requestFullscreen().catch(() => {});
+    }
+
     try {
       const { data, error } = await supabase
         .from('ExamSession')
@@ -339,6 +349,20 @@ const ExamPage = ({ session }) => {
   }, [examStarted, capture]);
 
   useEffect(() => {
+    let clipboardInterval = null;
+
+    if (examStarted) {
+      clipboardInterval = setInterval(() => {
+        navigator.clipboard.writeText("").catch(() => {});
+      }, 1500);
+    }
+
+    const showProhibitedToast = (message) => {
+      setClipboardToast(message);
+      addLog(`SECURITY INTERCEPT: ${message}`, "info", null);
+      setTimeout(() => setClipboardToast(null), 3500);
+    };
+
     const handleVisibilityChange = () => {
       if (isTerminatingRef.current || !examStartedRef.current) return;
       if (document.hidden) {
@@ -346,32 +370,74 @@ const ExamPage = ({ session }) => {
       }
     };
 
+    const handleFullscreenChange = () => {
+      if (isTerminatingRef.current || !examStartedRef.current) return;
+      if (!document.fullscreenElement) {
+        triggerManualWarning("Fullscreen Mode Exited");
+      }
+    };
+
     const handleContextMenu = (e) => {
-      if (examStartedRef.current && !isTerminatingRef.current) e.preventDefault();
+      if (examStartedRef.current && !isTerminatingRef.current) {
+        e.preventDefault();
+        showProhibitedToast("Right-Click Context Menu is Prohibited");
+      }
+    };
+
+    const handleCopyPasteCut = (e) => {
+      if (examStartedRef.current && !isTerminatingRef.current) {
+        e.preventDefault();
+        showProhibitedToast("Copy, Paste, and Cut Actions are Prohibited");
+      }
+    };
+
+    const handleKeyUp = (e) => {
+      if (isTerminatingRef.current || !examStartedRef.current) return;
+      if (e.key === 'PrintScreen') {
+        navigator.clipboard.writeText("").catch(() => {});
+        showProhibitedToast("Screen Capture Attempt Intercepted");
+      }
     };
 
     const handleKeyDown = (e) => {
       if (isTerminatingRef.current || !examStartedRef.current) return;
-      if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'x' || e.key === 'u')) {
+      if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'x')) {
         e.preventDefault();
-        triggerManualWarning("Prohibited Shortcut Executed");
+        showProhibitedToast("Clipboard Shortcuts are Prohibited");
+      } else if (e.ctrlKey && (e.key === 'u' || e.key === 'p')) {
+        e.preventDefault();
+        triggerManualWarning("Prohibited System Shortcut Executed");
       }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("contextmenu", handleContextMenu);
+    document.addEventListener("copy", handleCopyPasteCut);
+    document.addEventListener("paste", handleCopyPasteCut);
+    document.addEventListener("cut", handleCopyPasteCut);
+    window.addEventListener("keyup", handleKeyUp);
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      if (clipboardInterval) clearInterval(clipboardInterval);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("contextmenu", handleContextMenu);
+      document.removeEventListener("copy", handleCopyPasteCut);
+      document.removeEventListener("paste", handleCopyPasteCut);
+      document.removeEventListener("cut", handleCopyPasteCut);
+      window.removeEventListener("keyup", handleKeyUp);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [triggerManualWarning]);
+  }, [examStarted, triggerManualWarning, addLog]);
 
   const handleCloseWarningModal = () => {
     setShowWarningModal(false);
     showWarningModalRef.current = false;
+    if (examContainerRef.current && !document.fullscreenElement) {
+      examContainerRef.current.requestFullscreen().catch(() => {});
+    }
     setTimeout(() => {
       warningCooldownRef.current = false;
     }, 4000);
@@ -379,6 +445,9 @@ const ExamPage = ({ session }) => {
 
   const handleSubmit = async () => {
     cleanUpProctoringListeners();
+    if (document.fullscreenElement) {
+      await document.exitFullscreen().catch(() => {});
+    }
     const sessionId = currentSessionIdRef.current;
     if (sessionId) {
       await supabase.from('ExamSession').update({
@@ -391,9 +460,17 @@ const ExamPage = ({ session }) => {
 
   return (
     <div
-      className="fixed inset-0 min-h-screen w-screen bg-[#07090e] text-white p-6 overflow-y-auto z-50 flex flex-col box-border"
-      style={{ backgroundColor: '#07090e', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+      ref={examContainerRef}
+      className="w-full min-h-screen bg-[#07090e] text-white p-6 overflow-y-auto flex flex-col box-border relative"
+      style={{ backgroundColor: '#07090e' }}
     >
+      {clipboardToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 bg-[#0f0b0c] border border-amber-500 rounded-xl px-6 py-3 shadow-[0_0_25px_rgba(245,158,11,0.2)] flex items-center gap-3 animate-slide-in">
+          <AlertCircle size={16} className="text-amber-500" />
+          <p className="text-xs font-black tracking-tight text-white uppercase">{clipboardToast}</p>
+        </div>
+      )}
+
       {showWarningModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 transition-all">
           <div className="bg-[#0f0b0c] border-2 border-red-500 rounded-[2rem] w-full max-w-lg p-8 text-center relative overflow-hidden">
@@ -427,8 +504,14 @@ const ExamPage = ({ session }) => {
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 w-full flex-1 items-start box-border">
         <aside className="w-full flex flex-col gap-4 box-border">
           <div className="w-full aspect-video bg-black rounded-2xl border border-white/10 overflow-hidden relative shadow-2xl shrink-0">
-            <Webcam ref={webcamRef} audio={false} screenshotFormat="image/jpeg" videoConstraints={{ facingMode: "user" }} className="w-full h-full object-cover" />
-            <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/80 px-2 py-1 rounded text-[8px] font-bold uppercase">
+            <Webcam 
+              ref={webcamRef} 
+              audio={false} 
+              screenshotFormat="image/jpeg" 
+              videoConstraints={{ width: 1280, height: 720, facingMode: "user" }} 
+              className="w-full h-full object-cover" 
+            />
+            <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/80 px-2 py-1 rounded text-[8px] font-bold uppercase border border-white/10">
               <Activity size={10} className="text-red-500 animate-pulse" /> LIVE ANALYSIS
             </div>
           </div>
@@ -441,9 +524,9 @@ const ExamPage = ({ session }) => {
               <AlertCircle size={12} /> Forensic Stream
             </p>
             <div className="space-y-3 overflow-y-auto flex-1 pr-1">
-              {activityLog.length === 0 && <p className="text-[10px] italic">Waiting for telemetry...</p>}
+              {activityLog.length === 0 && <p className="text-[10px] italic text-white/20">Waiting for telemetry...</p>}
               {activityLog.map(log => (
-                <div key={log.id} className="text-[9px] border-l pl-2 py-1 border-white/10 break-words">
+                <div key={log.id} className="text-[9px] border-l pl-2 py-1 border-white/10 break-words text-white/60">
                   {log.description}
                 </div>
               ))}
@@ -453,35 +536,53 @@ const ExamPage = ({ session }) => {
 
         <main className="w-full bg-[#11141b] rounded-2xl border border-white/10 p-6 shadow-2xl flex flex-col justify-between box-border min-h-[460px]">
           {!examStarted ? (
-            <div className="w-full text-center my-auto flex flex-col justify-center h-full">
-              <h3 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">System Authentication</h3>
-              <p className="text-[10px] text-white/30 tracking-[0.4em] uppercase mb-8">Verification Core</p>
+            <div className="w-full text-center my-auto flex flex-col justify-center h-full max-w-2xl mx-auto px-4 box-border">
+              <h3 className="text-2xl font-black text-white mb-1 uppercase tracking-tighter italic">System Authentication</h3>
+              <p className="text-[10px] text-white/30 tracking-[0.4em] uppercase mb-8">Multi-Factor Verification Core</p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-10 max-w-xl mx-auto box-border">
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 box-border">
-                  <User size={20} className="text-[#39FF14] mx-auto mb-2" />
-                  <p className="text-[9px] font-black uppercase text-white/40 mb-1">1. Portrait capture</p>
-                  <span className={`text-[10px] font-bold ${faceCaptured ? "text-emerald-400" : "text-amber-400"}`}>{faceCaptured ? "LOCKED" : "REQUIRED"}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-8 box-border">
+                <div className="bg-[#11141b]/50 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-3 relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#39FF14]/20 to-transparent"></div>
+                  <User size={22} className="text-[#39FF14]" />
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">1. Portrait Capture</p>
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-md border text-[9px] font-black tracking-wider ${
+                    faceCaptured 
+                      ? "bg-[#39FF14]/10 border-[#39FF14]/30 text-[#39FF14]" 
+                      : "bg-amber-500/10 border-amber-500/20 text-amber-500 animate-pulse"
+                  }`}>
+                    <div className={`w-1 h-1 rounded-full ${faceCaptured ? "bg-[#39FF14]" : "bg-amber-500"}`}></div>
+                    <span>{faceCaptured ? "LOCKED" : "REQUIRED"}</span>
+                  </div>
                 </div>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 box-border">
-                  <FileText size={20} className="text-[#39FF14] mx-auto mb-2" />
-                  <p className="text-[9px] font-black uppercase text-white/40 mb-1">2. Identity Card</p>
-                  <span className={`text-[10px] font-bold ${idVerified ? "text-emerald-400" : "text-amber-400"}`}>{idVerified ? verifiedDocType.toUpperCase() : "PENDING"}</span>
+
+                <div className="bg-[#11141b]/50 border border-white/10 rounded-2xl p-6 flex flex-col items-center gap-3 relative overflow-hidden group">
+                  <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#39FF14]/20 to-transparent"></div>
+                  <FileText size={22} className="text-[#39FF14]" />
+                  <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">2. Identity Document</p>
+                  <div className={`flex items-center gap-1.5 px-3 py-1 rounded-md border text-[9px] font-black tracking-wider ${
+                    idVerified 
+                      ? "bg-[#39FF14]/10 border-[#39FF14]/30 text-[#39FF14]" 
+                      : "bg-amber-500/10 border-amber-500/20 text-amber-500"
+                  }`}>
+                    <div className={`w-1 h-1 rounded-full ${idVerified ? "bg-[#39FF14]" : "bg-amber-400"}`}></div>
+                    <span>{idVerified ? verifiedDocType.toUpperCase() : "PENDING"}</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="max-w-md mx-auto w-full box-border">
+              <div className="w-full box-border">
                 {!faceCaptured ? (
                   <button onClick={handleCaptureFace} disabled={isCapturingFace} className="w-full bg-white text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-gray-200 transition-all">
-                    {isCapturingFace ? <Loader2 className="animate-spin" /> : <Camera size={16} />} Step 1: Capture Live Photo
+                    {isCapturingFace ? <Loader2 className="animate-spin" /> : <Camera size={14} />} Step 1: Capture Live Photo
                   </button>
                 ) : !idVerified ? (
-                  <button onClick={handleVerifyIdentity} disabled={isVerifyingId} className="w-full bg-[#39FF14] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-400 transition-all">
-                    {isVerifyingId ? <Loader2 className="animate-spin" /> : <FileText size={16} />} Step 2: Verify Identity Card
+                  <button onClick={handleVerifyIdentity} disabled={isVerifyingId} className="w-full bg-[#39FF14] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(57,255,20,0.15)]">
+                    {isVerifyingId ? <Loader2 className="animate-spin" /> : <FileText size={14} />} Step 2: Verify Identity Card
                   </button>
                 ) : (
-                  <button onClick={handleStartExam} disabled={isInitializing} className="w-full bg-[#39FF14] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_20px_#39FF14] hover:bg-emerald-400 transition-all">
-                    {isInitializing ? <Loader2 className="animate-spin" /> : <Zap size={16} />} Deploy Assessment
+                  <button onClick={handleStartExam} disabled={isInitializing} className="w-full bg-[#39FF14] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(57,255,20,0.3)] hover:bg-emerald-400 transition-all group/btn">
+                    {isInitializing ? <Loader2 className="animate-spin" /> : <Zap size={14} className="fill-black" />} Deploy Target Assessment
+                    <ChevronRight size={14} className="group-hover/btn:translate-x-0.5 transition-transform" />
                   </button>
                 )}
               </div>
@@ -489,19 +590,32 @@ const ExamPage = ({ session }) => {
           ) : (
             <div className="w-full h-full flex flex-col justify-between flex-1 box-border">
               <div className="w-full">
-                <p className="text-[9px] font-black uppercase tracking-widest text-[#39FF14] mb-4">DATA SEGMENT: 0{currentIndex + 1}</p>
-                <h3 className="text-xl font-black mb-6 uppercase text-white tracking-tight">{examQuestions[currentIndex].question}</h3>
-                <div className="space-y-2 w-full">
+                <p className="text-[9px] font-black uppercase tracking-widest text-[#39FF14] mb-3">DATA SEGMENT: 0{currentIndex + 1}</p>
+                <h3 className="text-xl font-black mb-6 uppercase text-white tracking-tight border-b border-white/5 pb-4">{examQuestions[currentIndex].question}</h3>
+                <div className="space-y-3 w-full">
                   {examQuestions[currentIndex].options.map((opt, i) => (
-                    <button key={i} onClick={() => setAnswers({...answers, [currentIndex]: i})} className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center box-border ${answers[currentIndex] === i ? "border-[#39FF14] bg-[#39FF14]/5 text-[#39FF14]" : "border-white/5 hover:bg-white/5 text-white/40"}`}>
+                    <button 
+                      key={i} 
+                      onClick={() => setAnswers({...answers, [currentIndex]: i})} 
+                      className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center box-border group ${
+                        answers[currentIndex] === i 
+                          ? "border-[#39FF14] bg-[#39FF14]/5 text-[#39FF14] shadow-[0_0_15px_rgba(57,255,20,0.1)]" 
+                          : "border-white/5 bg-white/5 hover:border-white/20 text-white/60 hover:text-white"
+                      }`}
+                    >
                       <span className="text-sm font-bold uppercase tracking-tight">{opt}</span>
+                      <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition-all ${
+                        answers[currentIndex] === i ? "border-[#39FF14] bg-[#39FF14]" : "border-white/20 group-hover:border-white/40"
+                      }`}>
+                        {answers[currentIndex] === i && <ShieldCheck size={12} className="text-black stroke-[3]" />}
+                      </div>
                     </button>
                   ))}
                 </div>
               </div>
               <div className="pt-4 flex justify-between items-center mt-6 border-t border-white/5 w-full box-border">
-                <button onClick={() => setCurrentIndex(p => p - 1)} disabled={currentIndex === 0} className={`text-[9px] font-black uppercase tracking-widest ${currentIndex === 0 ? "opacity-0 cursor-default" : "hover:text-[#39FF14]"}`}>[ Previous ]</button>
-                <button onClick={currentIndex === examQuestions.length - 1 ? handleSubmit : () => setCurrentIndex(p => p + 1)} className="bg-[#39FF14] text-black font-black px-8 py-3 rounded-lg uppercase text-[11px] tracking-wider hover:bg-emerald-400 transition-all">
+                <button onClick={() => setCurrentIndex(p => p - 1)} disabled={currentIndex === 0} className={`text-[10px] font-black uppercase tracking-widest transition-colors ${currentIndex === 0 ? "opacity-0 cursor-default" : "text-white/40 hover:text-[#39FF14]"}`}>[ Previous ]</button>
+                <button onClick={currentIndex === examQuestions.length - 1 ? handleSubmit : () => setCurrentIndex(p => p + 1)} className="bg-[#39FF14] text-black font-black px-8 py-3 rounded-lg uppercase text-[11px] tracking-wider hover:bg-emerald-400 transition-all shadow-[0_0_15px_rgba(57,255,20,0.2)]">
                   {currentIndex === examQuestions.length - 1 ? "Terminate Session" : "Next Segment"}
                 </button>
               </div>

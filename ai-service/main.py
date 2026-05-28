@@ -20,21 +20,24 @@ class FrameData(BaseModel):
 @app.post("/analyze")
 async def analyze_frame(data: FrameData):
     try:
-        encoded = data.image.split(",", 1)[1]
-        image_data = base64.b64decode(encoded)
+        raw_image_string = data.image
+        if "," in raw_image_string:
+            raw_image_string = raw_image_string.split(",", 1)[1]
+            
+        image_data = base64.b64decode(raw_image_string)
         nparr = np.frombuffer(image_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         h, w, _ = frame.shape
-        zone_x_start = w * 0.25
-        zone_x_end = w * 0.75
+        zone_x_start = w * 0.15
+        zone_x_end = w * 0.85
 
-        results = model.predict(source=frame, conf=0.15, iou=0.45, verbose=False)
+        results = model.predict(source=frame, conf=0.25, iou=0.45, verbose=False)
 
         detected_labels = []
         candidate_persons = []
 
-        if len(results) > 0:
+        if len(results) > 0 and results[0].boxes is not None:
             for box in results[0].boxes:
                 cls_id = int(box.cls[0])
                 label = model.names[cls_id].lower()
@@ -48,7 +51,7 @@ async def analyze_frame(data: FrameData):
                     box_w = xyxy[2] - xyxy[0]
                     box_h = xyxy[3] - xyxy[1]
                     
-                    if (zone_x_start <= box_x_center <= zone_x_end and box_h > (h * 0.45) and box_w > (w * 0.25)):
+                    if (zone_x_start <= box_x_center <= zone_x_end and box_h > (h * 0.35)):
                         candidate_persons.append({
                             "w": box_w,
                             "h": box_h,
@@ -76,10 +79,10 @@ async def analyze_frame(data: FrameData):
                 inter_h = max(0, iou_y2 - iou_y1)
                 intersection = inter_w * inter_h
                 
-                if intersection / (s_xyxy[2] - s_xyxy[0]) * (s_xyxy[3] - s_xyxy[1]) > 0.60:
+                if intersection / ((s_xyxy[2] - s_xyxy[0]) * (s_xyxy[3] - s_xyxy[1]) + 1e-6) > 0.60:
                     continue
                     
-                if secondary["w"] > (w * 0.30) and secondary["h"] > (h * 0.50):
+                if secondary["w"] > (w * 0.20) and secondary["h"] > (h * 0.35):
                     person_count += 1
 
         violations = []
@@ -89,14 +92,24 @@ async def analyze_frame(data: FrameData):
         elif person_count == 0:
             violations.append("No Person Detected")
 
-        phone_triggers = {"cell phone", "remote", "mobile phone", "telephone", "calculator", "hand", "book"}
-        if any(obj in phone_triggers for obj in detected_labels):
-            violations.append("Cell Phone")
+        prohibited_objects = {
+            "cell phone": "Cell Phone",
+            "remote": "Cell Phone",
+            "mobile phone": "Cell Phone",
+            "telephone": "Cell Phone",
+            "calculator": "Prohibited Object Detected",
+            "book": "Prohibited Reference Material",
+            "tv": "External Display Detected",
+            "laptop": "Secondary Display Device",
+            "monitor": "External Display Detected"
+        }
 
-        if "laptop" in detected_labels:
-            violations.append("Laptop")
+        for label in detected_labels:
+            if label in prohibited_objects:
+                violations.append(prohibited_objects[label])
+                break
 
-        return {"status": "success", "detections": violations}
+        return {"status": "success", "detections": list(set(violations))}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -117,8 +130,11 @@ async def analyze_audio(file: UploadFile = File(...)):
 @app.post("/verify-document")
 async def verify_document(data: FrameData):
     try:
-        encoded = data.image.split(",", 1)[1]
-        image_data = base64.b64decode(encoded)
+        raw_image_string = data.image
+        if "," in raw_image_string:
+            raw_image_string = raw_image_string.split(",", 1)[1]
+            
+        image_data = base64.b64decode(raw_image_string)
         nparr = np.frombuffer(image_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -126,7 +142,7 @@ async def verify_document(data: FrameData):
             return {"status": "error", "verified": False, "message": "OCR Engine offline. Contact administrator."}
 
         h, w = frame.shape[:2]
-        resized = cv2.resize(frame, (w * 3, h * 3), interpolation=cv2.INTER_CUBIC)
+        resized = cv2.resize(frame, (w * 2, h * 2), interpolation=cv2.INTER_CUBIC)
         gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
         filtered = cv2.bilateralFilter(gray, 9, 75, 75)
         processed_frame = cv2.threshold(filtered, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
@@ -134,26 +150,16 @@ async def verify_document(data: FrameData):
         ocr_results = reader.readtext(processed_frame)
         extracted_text = " ".join([text[1].upper() for text in ocr_results])
 
-        if len(extracted_text.strip()) < 5:
-            return {"status": "error", "verified": False, "message": "No document text detected. Bring the card closer and clear glare."}
+        if len(extracted_text.strip()) < 3:
+            return {"status": "error", "verified": False, "message": "No text detected. Reposition your identification card close to the camera lens."}
 
-        has_aadhaar = any(k in extracted_text for k in ["GOVT", "INDIA", "DOB", "MALE", "FEMALE", "UNIQUE", "ENROLLMENT"])
-        has_pan = any(k in extracted_text for k in ["INCOME", "TAX", "DEPARTMENT", "PERMANENT", "CARD", "PANCARD"])
-        has_college = any(k in extracted_text for k in ["UNIVERSITY", "STUDENT", "IDENTITY", "CAMPUS", "COLLEGE", "INSTITUTE", "REG", "BCE", "BHOPAL", "VIT"])
-        has_dl = any(k in extracted_text for k in ["DRIVING", "LICENSE", "LICENCE", "TRANSPORT", "UNION", "DL-", "MH-", "MP-", "IN-"])
-
+        has_id_card = any(k in extracted_text for k in ["GOVT", "INDIA", "DOB", "MALE", "FEMALE", "UNIQUE", "ENROLLMENT", "INCOME", "TAX", "DEPARTMENT", "PERMANENT", "CARD", "PANCARD", "UNIVERSITY", "STUDENT", "IDENTITY", "CAMPUS", "COLLEGE", "INSTITUTE", "REG", "BCE", "BHOPAL", "VIT", "DRIVING", "LICENSE", "LICENCE", "TRANSPORT"])
         digit_count = len(re.findall(r'\d', extracted_text))
 
-        if has_aadhaar or digit_count >= 12:
-            return {"status": "success", "verified": True, "doc_type": "Aadhaar Card"}
-        elif has_pan:
-            return {"status": "success", "verified": True, "doc_type": "PAN Card"}
-        elif has_dl:
-            return {"status": "success", "verified": True, "doc_type": "Driving License"}
-        elif has_college:
-            return {"status": "success", "verified": True, "doc_type": "College ID"}
+        if has_id_card or digit_count >= 6:
+            return {"status": "success", "verified": True, "doc_type": "Identity Verification Document"}
 
-        if len(extracted_text.strip()) >= 8:
+        if len(extracted_text.strip()) >= 6:
             return {"status": "success", "verified": True, "doc_type": "Identity Document"}
 
         return {"status": "error", "verified": False, "message": "Document layout not recognized. Ensure text fields are clearly visible."}
