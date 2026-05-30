@@ -45,17 +45,17 @@ const Dashboard = ({ session }) => {
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-200 font-sans p-6 lg:p-10 selection:bg-[#39FF14]/30">
-      {/* Navbar - Standard Size */}
       <nav className="max-w-6xl mx-auto mb-12 flex justify-between items-center bg-[#11141b]/60 border border-white/10 p-5 rounded-2xl backdrop-blur-xl">
         <div className="flex items-center gap-4 group cursor-pointer">
           <div className="relative">
-            {/* Green Glow on Nav Logo */}
             <div className="absolute inset-0 bg-[#39FF14]/40 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <img src="/favicon.png" alt="SF" className="w-8 h-8 object-contain relative z-10 transition-transform group-hover:scale-110" />
           </div>
           <div className="h-6 w-[1px] bg-white/10 mx-1"></div>
-          <h2 className="text-sm tracking-[0.25em] font-black uppercase text-white">
-            SECUREFRAME<span className="text-[#39FF14]">AI</span>
+          <h2 className="text-sm tracking-[0.25em] uppercase font-light text-white/70">
+            <span className="font-black text-white tracking-[0.15em]">SECURE</span>
+            FRAME
+            <span className="text-[#39FF14] font-black drop-shadow-[0_0_10px_rgba(57,255,20,0.5)]">-AI</span>
           </h2>
         </div>
         
@@ -70,7 +70,6 @@ const Dashboard = ({ session }) => {
 
       <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* Welcome Hero */}
         <div className="lg:col-span-8 bg-[#11141b] border border-white/5 rounded-[2.5rem] p-10 relative overflow-hidden shadow-2xl">
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-6">
@@ -87,7 +86,6 @@ const Dashboard = ({ session }) => {
           </div>
         </div>
 
-        {/* Stats Column */}
         <div className="lg:col-span-4 grid grid-cols-1 gap-6">
           <div className="bg-[#11141b] border border-white/5 rounded-[2rem] p-8 flex flex-col justify-between hover:border-[#39FF14]/20 transition-all group">
             <div className="flex justify-between items-start">
@@ -116,13 +114,11 @@ const Dashboard = ({ session }) => {
           </div>
         </div>
 
-        {/* Assessment Module - Balanced Size & Logo Glow */}
         <div className="lg:col-span-12 bg-white/5 border border-white/10 rounded-[3rem] p-[1px] group">
           <div className="bg-[#07090e] rounded-[2.9rem] p-8 lg:p-12 flex flex-col md:flex-row items-center justify-between gap-10 hover:bg-[#0c0e14] transition-colors">
             
             <div className="flex flex-col md:flex-row items-center gap-10 text-center md:text-left">
               <div className="relative group/logo cursor-pointer">
-                {/* Green Glow on Assessment Logo */}
                 <div className="absolute inset-0 bg-[#39FF14]/30 blur-3xl rounded-full scale-150 opacity-0 group-hover/logo:opacity-100 transition-opacity duration-700"></div>
                 <img 
                   src="/favicon.png" 

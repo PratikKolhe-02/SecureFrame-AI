@@ -1,0 +1,8 @@
+venv
+__pycache__
+*.pyc
+*.pt
+*.jpg
+*.png
+yolov8n_openvino_model
+.gitignore

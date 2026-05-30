@@ -447,7 +447,11 @@ const ExamPage = ({ session }) => {
       )}
 
       <nav className="flex justify-between items-center mb-6 border border-white/10 bg-[#11141b] p-4 rounded-2xl w-full h-16 box-border shrink-0">
-        <h2 className="text-sm tracking-[0.3em] font-black uppercase">SECUREFRAME<span className="text-[#39FF14]">-AI</span></h2>
+        <h2 className="text-sm tracking-[0.25em] uppercase font-light text-white/70">
+          <span className="font-black text-white tracking-[0.15em]">SECURE</span>
+          FRAME
+          <span className="text-[#39FF14] font-black drop-shadow-[0_0_10px_rgba(57,255,20,0.5)]">-AI</span>
+        </h2>
         <div className={`px-4 py-1.5 rounded-lg text-[10px] font-black border ${status === 'VIOLATION' ? 'bg-red-500/20 border-red-500 text-red-500' : 'bg-[#39FF14]/10 border-[#39FF14]/40 text-[#39FF14]'}`}>
           STATUS: {status}
         </div>
